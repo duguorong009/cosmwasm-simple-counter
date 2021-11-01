@@ -41,6 +41,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::Increment {} => try_increment(deps),
         ExecuteMsg::Reset { count } => try_reset(deps, info, count),
+        ExecuteMsg::Decrement {} => try_decrement(deps),
     }
 }
 
@@ -51,6 +52,15 @@ pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
     })?;
 
     Ok(Response::new().add_attribute("method", "try_increment"))
+}
+
+pub fn try_decrement(deps: DepsMut) -> Result<Response, ContractError> {
+    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
+        state.count -= 1;
+        Ok(state)
+    })?;
+
+    Ok(Response::new().add_attribute("method", "try_decrement"))
 }
 pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
@@ -143,5 +153,24 @@ mod tests {
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
         let value: CountResponse = from_binary(&res).unwrap();
         assert_eq!(5, value.count);
+    }
+
+    #[test]
+    fn try_decrement() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg { count: 10 };
+        let info = mock_info("creator", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg);
+
+        // anyone can decrement the "count".
+        let info = mock_info("anyone", &[]);
+        let decrement_msg = ExecuteMsg::Decrement {};
+        let _res = execute(deps.as_mut(), mock_env(), info, decrement_msg);
+
+        // Check the query value if match expectation.
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value: CountResponse = from_binary(&res).unwrap();
+        assert_eq!(10 - 1, value.count);
     }
 }
